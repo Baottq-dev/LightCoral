@@ -1,0 +1,34 @@
+# =============================================================================
+# LightCoral-YOLO — requirements.txt
+# Python 3.11 | RTX 4060 | CUDA driver 13.0 → cu128
+#
+# Cài tất cả 1 lần:
+#   pip install -r requirements.txt
+#
+# Kiểm tra GPU sau khi cài:
+#   python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
+# =============================================================================
+
+# ─── PyTorch CUDA index (khai báo trước khi list torch) ──────────────────────
+--extra-index-url https://download.pytorch.org/whl/cu128
+
+# ─── PyTorch (pin exact CUDA version, cu128 có từ torch 2.7.0 trở lên) ───────
+# torch 2.7.1 là bản mới nhất trên cu128 index (kiểm tra thực tế 2026-05-21)
+torch==2.7.1+cu128
+torchvision==0.22.1+cu128      # torchvision phải đúng cặp với torch
+
+# ─── Core ─────────────────────────────────────────────────────────────────────
+ultralytics==8.4.52            # YOLO framework: YOLOv8/9/10/11/12 (latest stable)
+Pillow==12.2.0                 # JPEG/EXIF reading (latest, Python 3.11 ✓)
+tqdm==4.67.1                   # Progress bars (latest stable)
+
+# ─── Data / Scientific ────────────────────────────────────────────────────────
+numpy==2.2.6                   # Array ops (latest, numpy 2.x ✓ với Python 3.11)
+opencv-python==4.11.0.86       # Image I/O (latest stable, Python 3.11 ✓)
+
+# ─── Visualization ────────────────────────────────────────────────────────────
+matplotlib==3.10.3             # Training plots (latest stable)
+
+# ─── Experiment tracking (optional) ──────────────────────────────────────────
+# tensorboard>=2.18.0          # Uncomment to enable TensorBoard logging
+# wandb>=0.18.0                # Uncomment to enable Weights & Biases logging
