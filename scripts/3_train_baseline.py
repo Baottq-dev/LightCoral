@@ -32,9 +32,23 @@ Usage:
 
   # CPU (no GPU)
   python scripts/3_train_baseline.py --device cpu
+
+  # ──────────────────────────────────────────────────────
+  # Custom online augmentation (RAM-based, từ 2_augmentations.py)
+  # ──────────────────────────────────────────────────────
+  # Bật custom augmentation (tất cả 4 groups, intensity mặc định = medium)
+  python scripts/3_train_baseline.py --model yolov8s --custom_aug
+
+  # Chỉ dùng underwater + noise, intensity mạnh
+  python scripts/3_train_baseline.py --model yolo11s --custom_aug \\
+      --aug_groups underwater noise --aug_intensity strong
+
+  # Preview transforms trước khi train (không cần train)
+  python scripts/2_augmentations.py --preview datasets/coral_soft_yolo/images/train/Sinularia_1.JPG
 """
 
 import argparse
+import importlib.util
 import sys
 from pathlib import Path
 
@@ -82,6 +96,22 @@ MODELS: dict[str, str] = {
     "rtdetr-r101": "rtdetr-resnet101.yaml",
 }
 # ───────────────────────────────────────────────────────────────────────────────
+
+
+def _load_aug_module():
+    """
+    Import 2_augmentations.py động (tên file có số nên không dùng 'import' trực tiếp).
+    Đảm bảo module được đăng ký vào sys.modules trước exec_module để tránh lỗi dataclass.
+    """
+    aug_path = Path(__file__).parent / "2_augmentations.py"
+    if not aug_path.exists():
+        print(f"[ERROR] Không tìm thấy: {aug_path}")
+        sys.exit(1)
+    spec = importlib.util.spec_from_file_location("coral_augmentations", str(aug_path))
+    mod  = importlib.util.module_from_spec(spec)
+    sys.modules["coral_augmentations"] = mod   # đăng ký trước khi exec → fix dataclass
+    spec.loader.exec_module(mod)
+    return mod
 
 
 def parse_args():
@@ -139,6 +169,28 @@ def parse_args():
                         help="HSV hue shift (small: underwater has fixed color cast).")
     parser.add_argument("--hsv_s",   type=float, default=0.7)
     parser.add_argument("--hsv_v",   type=float, default=0.4)
+
+    # ── Custom augmentation (2_augmentations.py) ───────────────────────────────────
+    parser.add_argument(
+        "--custom_aug", action="store_true",
+        help=(
+            "Dùng CoralTrainer với custom underwater augmentation (từ 2_augmentations.py). "
+            "Augmentation chạy in-RAM, không ghi file ra disk."
+        ),
+    )
+    parser.add_argument(
+        "--aug_groups", nargs="+",
+        default=["underwater", "noise", "occlusion", "gamma"],
+        choices=["underwater", "noise", "occlusion", "gamma"],
+        metavar="GROUP",
+        help="Các nhóm augmentation (chỉ dùng với --custom_aug). "
+             "Choices: underwater noise occlusion gamma",
+    )
+    parser.add_argument(
+        "--aug_intensity", type=str, default="medium",
+        choices=["light", "medium", "strong"],
+        help="Độ mạnh augmentation: nhân hệ số 0.5×/1×/1.5× lên probability (chỉ dùng với --custom_aug).",
+    )
 
     # ── Runtime ────────────────────────────────────────────────────────────────
     parser.add_argument("--device",  type=str, default="0",
@@ -209,51 +261,93 @@ def main():
     print(f"  Output  : {args.project}/{run_name}")
     print("=" * 56)
 
-    # Output path: truyền nguyên relative path như run_benchmark.ps1
-    # Ultralytics sẽ lưu vào runs/detect/runs/coral_benchmark/<name>/
-    # ─────────────────────────────────────────────────────────────────────────
+    # ── Train ────────────────────────────────────────────────────────────────
+    if args.custom_aug:
+        # ── Custom aug: dùng CoralTrainer từ 2_augmentations.py ──────────────────
+        aug = _load_aug_module()
+        coral_config = aug.CoralAugConfig(
+            groups    = args.aug_groups,
+            intensity = args.aug_intensity,
+        )
+        print(coral_config.summary())
+        print("=" * 56)
 
-    results = model.train(
-        data          = str(data_path),
-        epochs        = args.epochs,
-        imgsz         = args.imgsz,
-        batch         = args.batch,
-        optimizer     = args.optimizer,
-        lr0           = args.lr0,
-        lrf           = args.lrf,
-        weight_decay  = args.weight_decay,
-        warmup_epochs = args.warmup_epochs,
-        # Augmentation
-        mosaic        = args.mosaic,
-        flipud        = args.flipud,
-        fliplr        = args.fliplr,
-        degrees       = args.degrees,
-        hsv_h         = args.hsv_h,
-        hsv_s         = args.hsv_s,
-        hsv_v         = args.hsv_v,
-        # Runtime
-        device        = args.device,
-        workers       = args.workers,
-        # Output
-        project       = args.project,
-        name          = run_name,
-        save          = True,
-        plots         = True,
-        val           = True,
-        resume        = bool(args.resume),
-    )
+        overrides = dict(
+            model         = args.weights or MODELS[args.model],
+            data          = str(data_path),
+            epochs        = args.epochs,
+            imgsz         = args.imgsz,
+            batch         = args.batch,
+            optimizer     = args.optimizer,
+            lr0           = args.lr0,
+            lrf           = args.lrf,
+            weight_decay  = args.weight_decay,
+            warmup_epochs = args.warmup_epochs,
+            # Ultralytics built-in augmentation
+            mosaic        = args.mosaic,
+            flipud        = args.flipud,
+            fliplr        = args.fliplr,
+            degrees       = args.degrees,
+            hsv_h         = args.hsv_h,
+            hsv_s         = args.hsv_s,
+            hsv_v         = args.hsv_v,
+            # Runtime
+            device        = args.device,
+            workers       = args.workers,
+            # Output
+            project       = args.project,
+            name          = run_name,
+            save          = True,
+            plots         = True,
+            val           = True,
+            resume        = bool(args.resume),
+        )
+        trainer = aug.CoralTrainer(overrides=overrides, coral_config=coral_config)
+        results = trainer.train()
 
-    # ── Summary ────────────────────────────────────────────────────────────────
-    map50    = results.results_dict.get("metrics/mAP50(B)", None)
-    map50_95 = results.results_dict.get("metrics/mAP50-95(B)", None)
+    else:
+        # ── Standard training: dùng model.train() của Ultralytics ────────────────────
+        results = model.train(
+            data          = str(data_path),
+            epochs        = args.epochs,
+            imgsz         = args.imgsz,
+            batch         = args.batch,
+            optimizer     = args.optimizer,
+            lr0           = args.lr0,
+            lrf           = args.lrf,
+            weight_decay  = args.weight_decay,
+            warmup_epochs = args.warmup_epochs,
+            # Augmentation
+            mosaic        = args.mosaic,
+            flipud        = args.flipud,
+            fliplr        = args.fliplr,
+            degrees       = args.degrees,
+            hsv_h         = args.hsv_h,
+            hsv_s         = args.hsv_s,
+            hsv_v         = args.hsv_v,
+            # Runtime
+            device        = args.device,
+            workers       = args.workers,
+            # Output
+            project       = args.project,
+            name          = run_name,
+            save          = True,
+            plots         = True,
+            val           = True,
+            resume        = bool(args.resume),
+        )
+
+    # ── Summary (chung cho cả hai mode) ───────────────────────────────────────
+    rd       = getattr(results, "results_dict", {}) or {}
+    map50    = rd.get("metrics/mAP50(B)")
+    map50_95 = rd.get("metrics/mAP50-95(B)")
 
     print("\n" + "=" * 56)
-    print("Training complete!")
+    mode_label = " (CoralAug pipeline)" if args.custom_aug else ""
+    print(f"Training complete!{mode_label}")
     print(f"  Best weights : {args.project}/{run_name}/weights/best.pt")
-    if map50 is not None:
-        print(f"  mAP@0.5      : {map50:.4f}")
-    if map50_95 is not None:
-        print(f"  mAP@0.5:0.95 : {map50_95:.4f}")
+    if map50    is not None: print(f"  mAP@0.5      : {map50:.4f}")
+    if map50_95 is not None: print(f"  mAP@0.5:0.95 : {map50_95:.4f}")
     print("=" * 56)
     print(f"\nNext step:")
     print(f"  python scripts/4_evaluate.py --weights {args.project}/{run_name}/weights/best.pt")
