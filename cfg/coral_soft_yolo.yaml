@@ -1,0 +1,19 @@
+# cfg/coral_soft_yolo.yaml
+# SCoralDet - Soft Coral Detection Dataset (6 classes, 646 underwater images)
+# Split CUNG 8-1-1 da chia san (Ultralytics detect format).
+# Giu nguyen path + ten lop dung nhu file benchmark cu de ket qua so sanh duoc.
+# Ultralytics TU suy ra duong dan nhan: thay 'images' -> 'labels' trong path.
+
+path: f:/LightCoral-YOLO/datasets/coral_soft_yolo   # giu nguyen path benchmark cu (Windows, dung dau / xuoi)
+train: images/train              # 80%
+val:   images/val                # 10%
+test:  images/test               # 10%
+
+nc: 6
+names:
+  0: Euphflfiaancora   # Soft coral (feathery)
+  1: Favosites         # Brain-like coral
+  2: Platygyra         # Maze coral
+  3: Sarcophyton       # Leather coral
+  4: Sinularia         # Finger coral
+  5: WavingHand        # Waving hand coral

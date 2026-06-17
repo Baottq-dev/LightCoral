@@ -21,14 +21,36 @@ torchvision==0.22.1+cu128      # torchvision phải đúng cặp với torch
 ultralytics==8.4.52            # YOLO framework: YOLOv8/9/10/11/12 (latest stable)
 Pillow==12.2.0                 # JPEG/EXIF reading (latest, Python 3.11 ✓)
 tqdm==4.67.1                   # Progress bars (latest stable)
+pyyaml==6.0.3                  # YAML parser (Python 3.11 ✓)
+ultralytics-thop==2.0.20       # đo FLOPs (thay thế thop deprecated, utils/flops_fps.py)
 
 # ─── Data / Scientific ────────────────────────────────────────────────────────
 numpy==2.2.6                   # Array ops (latest, numpy 2.x ✓ với Python 3.11)
 opencv-python==4.11.0.86       # Image I/O (latest stable, Python 3.11 ✓)
+scipy==1.17.1                  # corrected t-test, bootstrap (Python 3.11 + numpy 2.2 ✓)
+scikit-learn==1.9.0            # GroupKFold (Python 3.11 + numpy 2.2 + scipy 1.17 ✓)
+pandas==2.3.3                  # aggregate kết quả (numpy 2.2 ✓)
+
+# ─── Albumentations (image augmentation pipeline) ─────────────────────────────
+# Dùng trong main.py để áp dụng White Balance, Gamma, Sharpen, CLAHE
+# qua callback on_train_batch_start của Ultralytics YOLO.
+#
+# Dependencies tự động cài theo:
+#   - imgaug (optional, chỉ cần nếu dùng A.imgaug wrappers)
+#   - scikit-image>=0.21.0  (cho một số transforms nâng cao)
+#   - qudida>=0.0.4         (HistogramMatching)
+#   - albucore>=0.0.28      (low-level kernels của albumentations)
+#
+# albumentations 2.0.8 là bản stable cuối cùng của repo gốc.
+# Team đã chuyển sang AlbumentationsX (xem bên dưới).
+albumentations==2.0.8          # Stable release — RGBShift, RandomGamma, Sharpen, CLAHE ✓
+#
+# ── Nếu muốn dùng bản mới nhất (actively maintained fork) ───────────────────
+# albumentationsx==2.3.0       # Drop-in replacement cho albumentations, API tương thích
 
 # ─── Visualization ────────────────────────────────────────────────────────────
 matplotlib==3.10.3             # Training plots (latest stable)
 
 # ─── Experiment tracking (optional) ──────────────────────────────────────────
-# tensorboard>=2.18.0          # Uncomment to enable TensorBoard logging
-# wandb>=0.18.0                # Uncomment to enable Weights & Biases logging
+# tensorboard==2.20.0          # Uncomment to enable TensorBoard logging
+# wandb==0.27.2                # Uncomment to enable Weights & Biases logging

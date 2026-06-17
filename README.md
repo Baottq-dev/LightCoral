@@ -1,302 +1,136 @@
-# LightCoral-YOLO — SCoralDet Benchmark
+# SC-YOLO12 — Hướng dẫn sử dụng
 
-Benchmark pipeline for the **SCoralDet** dataset (soft coral detection) using the Ultralytics YOLO family.
+Mã nguồn ablation 5 module trên baseline **YOLOv12n** cho bài toán phát hiện san hô mềm (SCoralDet, 646 ảnh, 6 lớp). Mọi tổ hợp từ 0–5 module đều chạy được qua cờ CLI.
 
----
-
-## Dataset — SCoralDet
-
-| Property | Value |
-|---|---|
-| Total images | 646 |
-| Total bounding boxes | 2,199 |
-| Classes | 6 |
-| Annotation format | LabelMe custom JSON (center-based bbox) |
-| Image sizes | Mixed (e.g. 6000×4000, 3264×2448, …) |
-| EXIF orientation | 606 normal · 19 rotate-90°CW · 21 rotate-90°CCW |
-
-### Class distribution
-
-| ID | Class | Bbox count |
-|---|---|---|
-| 0 | Euphflfiaancora | 408 |
-| 1 | Favosites | 221 |
-| 2 | Platygyra | 185 |
-| 3 | Sarcophyton | 339 |
-| 4 | Sinularia | 761 |
-| 5 | WavingHand | 285 |
-
-### Directory layout (raw)
-
-```
-data/coral_soft/
-├── annotations/        # 646 per-image JSON files
-│   ├── Euphflfiaancora_1.json
-│   └── ...
-└── image/
-    ├── Euphflfiaancora/   112 images
-    ├── Favosites/         107 images
-    ├── Platygyra/         103 images
-    ├── Sarcophyton/       111 images
-    ├── Sinularia/         110 images
-    └── WavingHand/        103 images
-```
-
----
-
-## Installation
-
-### Cài tất cả 1 lần
+## 1. Cài đặt
 
 ```bash
+git clone <repo> && cd sc-yolo12
 pip install -r requirements.txt
+# tai trong so pretrained
+# yolov12n.pt tu repo YOLOv12 chinh thuc (sunsmarterjie/yolov12)
 ```
 
-`requirements.txt` đã bao gồm `--extra-index-url` trỏ vào pytorch.org và pin sẵn `torch==2.7.1+cu128` — pip sẽ tự kéo bản GPU đúng cho **RTX 4060 (CUDA 12.8)**.
+Cấu trúc thư mục (khớp 1-1 với các trang con ở đây):
 
-Kiểm tra GPU sau khi cài:
-```bash
-python -c "import torch; print(torch.cuda.is_available(), torch.cuda.get_device_name(0))"
-# Expected: True  NVIDIA GeForce RTX 4060 Laptop GPU
+```jsx
+sc-yolo12/
+├─ cfg/            # base_yolov12n.yaml, base_yolov12n_shallow.yaml, module_specs.yaml
+├─ models/         # common.py, registry.py, shallow_p2.py, sfdf.py, pg_dam.py, fga2.py
+├─ train.py        # CLI huan luyen (chay: python train.py)
+├─ augment/        # physics_degradation.py
+├─ engine/         # build_model.py, losses.py
+├─ eval/           # group_kfold.py, bootstrap_ci.py, corrected_ttest.py
+├─ utils/          # seed.py, flops_fps.py
+└─ requirements.txt
 ```
 
-> **Máy khác / CUDA version khác:** Đổi `cu128` → đúng version trên [pytorch.org](https://pytorch.org/get-started/locally/) rồi sửa trong `requirements.txt`.
+## 2. Bảng module
 
----
+| **#** | **Module** | **Loại** | **Vị trí tác động** | **File** |
+| --- | --- | --- | --- | --- |
+| ① | Shallow-feature (AMCF + shallow-fusion) | Kiến trúc | AMCF thay downsample idx 7 + fuse layer 2→head P3 (giữ 3 head) | `models/shallow_p2.py`  • `cfg/base_yolov12n_shallow.yaml` |
+| ② | SFDF (spatial–frequency DWT fusion) | Kiến trúc | Thay 4 khối tại idx 2/4/6/8 | `models/sfdf.py` |
+| ③ | Physics degradation aug | Train-only | `preprocess_batch` (không đổi kiến trúc) | `augment/physics_degradation.py` |
+| ④ | PG-DAM (FiLM + L_deg) | Kiến trúc + loss | Chèn sau stem idx 0 | `models/pg_dam.py`  • `engine/losses.py` |
+| ⑤ | FGA² (frequency-gated area attention) | Kiến trúc | Thay A2C2f tại idx 11, 14 (neck) | `models/fga2.py` |
 
-## Pipeline
-
-### Step 0 — Analyze dataset (optional)
-
-```bash
-python scripts/0_analyze_dataset.py
-```
-
-Outputs: class distribution, EXIF orientation counts, out-of-bounds bbox stats.
-
----
-
-### Step 1 — Prepare dataset (convert + split)
-
-Converts LabelMe JSON annotations → YOLO `.txt` labels and splits the data into train/val/test.
-
-```bash
-# Default: 70% train / 15% val / 15% test
-python scripts/1_prepare_dataset.py
-
-# Custom split
-python scripts/1_prepare_dataset.py --split 0.8/0.1/0.1
-
-# All options
-python scripts/1_prepare_dataset.py \
-    --ann_dir  data/coral_soft/annotations \
-    --img_root data/coral_soft/image \
-    --out_dir  datasets/coral_soft_yolo \
-    --split    0.7/0.15/0.15 \
-    --seed     42 \
-    --overwrite
-```
-
-**Output structure:**
-
-```
-datasets/coral_soft_yolo/
-├── images/
-│   ├── train/   452 images
-│   ├── val/      97 images
-│   └── test/     97 images
-└── labels/
-    ├── train/   452 .txt files
-    ├── val/      97 .txt files
-    └── test/     97 .txt files
-```
-
----
-
-### Step 2 — Train baseline
+## 3. Quickstart
 
 ```bash
-# Quick start (yolov8s, 100 epochs, 640px)
-python scripts/3_train_baseline.py
+# ===== BUOC DAU: split CUNG 8-1-1 da chia san (cfg/coral_soft_yolo.yaml) =====
+# B1. Baseline B0
+python train.py --data cfg/coral_soft_yolo.yaml --modules "" --seed 0
 
-# Larger model at higher resolution
-python scripts/3_train_baseline.py --model yolov8m --imgsz 1280 --epochs 150
+# B2. To hop tuy chon (vd module 1,2,4)
+python train.py --data cfg/coral_soft_yolo.yaml --modules 1,2,4 --seed 0
 
-# Resume interrupted run
-python scripts/3_train_baseline.py --resume runs/coral_benchmark/yolov8s_ep100/weights/last.pt
+# B3. Preset day du
+python train.py --data cfg/coral_soft_yolo.yaml --preset E8 --seed 0
+
+# B4. Multi-seed (bao cao mean +- std)
+for s in 0 1 2; do python train.py --data cfg/coral_soft_yolo.yaml --preset E8 --seed $s; done
+
+# B5. Danh gia tren tap TEST (sau khi train xong)
+python test.py --weights runs/scyolo12/E8_s0/weights/best.pt --data cfg/coral_soft_yolo.yaml --csv runs/scyolo12/E8_s0_test.csv
+
+# B6. Chi phi tinh toan
+python -m utils.flops_fps --modules 1,2,4,5 --device 0
+
+# ===== (TUY CHON, ve sau) GroupKFold chong leakage near-duplicate =====
+# python -m eval.group_kfold --images datasets/coral_soft_yolo/images/train --k 5
+# python train.py --data data/folds/coral_fold0.yaml --preset E8 --seed 0
 ```
 
-**Supported models (ultralytics hub — auto-downloaded):**
+## 4. Bảng preset (khớp `cfg/module_specs.yaml`)
 
-| Family | Variants |
-|---|---|
-| YOLOv8 | `yolov8n` `yolov8s` `yolov8m` `yolov8l` `yolov8x` |
-| YOLOv9 | `yolov9c` `yolov9e` |
-| YOLOv10 | `yolov10n` `yolov10s` `yolov10m` `yolov10b` `yolov10l` `yolov10x` |
-| YOLO11 | `yolo11n` `yolo11s` `yolo11m` `yolo11l` `yolo11x` |
-| YOLO12 | `yolo12n` `yolo12s` `yolo12m` `yolo12l` `yolo12x` |
+| **Preset** | **Modules** | **Ý nghĩa** |
+| --- | --- | --- |
+| B0 | — | YOLOv12n thuần |
+| E1 | 3 | chỉ physics aug |
+| E2 | 1 | chỉ AMCF + shallow-fusion |
+| E3 | 2 | chỉ SFDF |
+| E4 | 1,2 | Shallow + SFDF |
+| E5 | 1,2,3 |   • physics aug |
+| E6 | 1,2,3,4 |   • PG-DAM |
+| E7 | 1,2,3,5 |   • FGA² (không PG-DAM) |
+| E8 | 1,2,3,4,5 | full SC-YOLO12 |
 
-All pretrained weights are downloaded automatically on first run.
+Ngoài preset, `--modules` nhận **mọi tổ hợp** con của {1..5} (32 tổ hợp).
 
-**Custom / local model (e.g. YOLO26):**
-
-YOLO26 is not in the ultralytics hub — use `--weights` to point to your local `.pt`:
+## 5. Smoke tests (chạy trước khi train thật)
 
 ```bash
-python scripts/3_train_baseline.py \
-    --weights f:/YOLO26-SELF_DISTI/weights/yolo26s.pt \
-    --epochs 100 --imgsz 640
+# 1) Build + forward du 16 kien truc (to hop {1,2,4,5})
+python -m engine.build_model
 ```
 
----
+```python
+# 2) DWT kha nghich: HaarIDWT(HaarDWT(x)) ~ x
+import torch
+from models.common import HaarDWT, HaarIDWT
+x = torch.randn(2, 16, 64, 64)
+assert torch.allclose(HaarIDWT()(HaarDWT()(x)), x, atol=1e-5)
 
-### Step 2b — Multi-model Benchmark (PowerShell)
+# 3) SFDF (4 khoi idx 2/4/6/8) + AMCF (idx 7) giu dung shape
+from models.sfdf import SFDF
+from models.shallow_p2 import AMCF
+assert SFDF(64, 128)(torch.randn(2, 64, 80, 80)).shape == (2, 128, 80, 80)
+assert SFDF(256, 256, swap=True)(torch.randn(2, 256, 20, 20)).shape == (2, 256, 20, 20)
+assert AMCF(128, 256, 2)(torch.randn(2, 128, 40, 40)).shape == (2, 256, 20, 20)
 
-Chạy nhiều model liên tiếp, tự động train → evaluate từng model.
+# 4) FGA2: lambda=0 => tuong duong attention goc; lambda co gradient
+from models.fga2 import FGA2_A2C2f
+m = FGA2_A2C2f(384, 128, n=1, area=4, lambda_init=0.0)
+out = m(torch.randn(2, 384, 40, 40))
+assert out.shape == (2, 128, 40, 40)
+out.sum().backward()
+lams = [p for n_, p in m.named_parameters() if n_.endswith("lam")]
+assert all(p.grad is not None for p in lams), "lambda phai nhan gradient"
 
-**Lần đầu tiên** — cho phép chạy script PS1 (chỉ cần làm 1 lần):
-```powershell
-Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+# 5) Physics aug: z_gt dung shape, anh trong [0,1]
+import yaml
+from augment.physics_degradation import from_specs
+specs = yaml.safe_load(open("cfg/module_specs.yaml"))
+aug = from_specs(specs)
+imgs, z = aug(torch.rand(4, 3, 640, 640))
+assert z.shape == (4, 7) and imgs.min() >= 0 and imgs.max() <= 1
 ```
 
-**Chạy benchmark:**
-```powershell
-# Mặc định: tất cả model trong $Models list, 100 epochs, 640px, train+eval
-.\scripts\run_benchmark.ps1
+## 6. Sanity checks trước khi báo cáo kết quả
 
-# Xem lệnh sẽ chạy mà không thực thi (kiểm tra trước)
-.\scripts\run_benchmark.ps1 -DryRun
+- [ ]  GroupKFold: không group nào xuất hiện ở cả train và val (assert sẵn trong `eval/group_kfold.py`).
+- [ ]  Mỗi cấu hình chạy đủ seeds [0, 1, 2]; báo cáo mean ± std, không cherry-pick seed tốt nhất.
+- [ ]  So sánh A vs B: `eval/corrected_ttest.py` (mức fold×seed) **và** `eval/bootstrap_ci.py` (mức ảnh).
+- [ ]  Báo cáo kèm Params/GFLOPs/FPS từ `utils/flops_fps.py` cho mọi cấu hình trong bảng chính.
+- [ ]  Kiểm tra log `L_deg` giảm dần khi dùng ④+③ (nếu không giảm → xem lại chuẩn hóa z).
 
-# Custom params
-.\scripts\run_benchmark.ps1 -Epochs 50 -ImgSz 1280 -Batch 8
+<aside>
+⚠️
 
-# Evaluate trên val thay vì test
-.\scripts\run_benchmark.ps1 -EvalSplit val
+**Hạn chế đã biết:**
 
-# Chỉ train, bỏ qua evaluate
-.\scripts\run_benchmark.ps1 -SkipEval
-```
-
-**Chọn model** — mở `scripts/run_benchmark.ps1` và bỏ comment:
-```powershell
-$Models = @(
-    "yolov8n",
-    "yolov8s",
-    # "yolov8m",          # ← comment = bỏ qua
-    "yolo11s",
-    "yolo12s",
-    # YOLO26 (custom — phải dùng __custom__:path):
-    # "__custom__:f:/YOLO26-SELF_DISTI/weights/yolo26s.pt"
-)
-```
-
-> ⚠️ **YOLO26** không có trên ultralytics hub. Phải dùng `"__custom__:path/to/yolo26s.pt"`, không được ghi thẳng `"yolo26n"`.
-
-**Output sau khi chạy xong:**
-```
-runs/coral_benchmark/
-├── yolov8n_imgsz640_ep100/weights/best.pt
-├── yolo11s_imgsz640_ep100/weights/best.pt
-└── _logs/
-    ├── summary_20260521_192300.txt   ← bảng tổng hợp
-    ├── yolov8n_train_*.txt           ← log train từng model
-    ├── yolov8n_eval_*.txt            ← log eval từng model
-    └── eval_yolov8n_*_test.json      ← metrics JSON
-```
-
-Bảng tổng hợp cuối chạy:
-```
-Model      Train           Eval    mAP50   Duration
-------     ------          ----    -----   --------
-yolov8n    OK (18.3m)      OK      0.7821  19.1m
-yolo11s    OK (21.5m)      OK      0.8043  22.4m
-```
-
----
-
-### Step 3 — Evaluate (single model)
-
-```bash
-python scripts/4_evaluate.py \
-    --weights runs/coral_benchmark/yolov8s_imgsz640_ep100/weights/best.pt
-
-# Evaluate on val split instead of test
-python scripts/4_evaluate.py --weights ... --split val
-```
-
-Output: per-class AP@0.5, mAP@0.5, mAP@0.5:0.95, Precision, Recall — saved as JSON.
-
----
-
-## Full CLI Reference
-
-### `1_prepare_dataset.py`
-
-| Argument | Default | Description |
-|---|---|---|
-| `--ann_dir` | `data/coral_soft/annotations` | JSON annotation directory |
-| `--img_root` | `data/coral_soft/image` | Image root (with class subfolders) |
-| `--out_dir` | `datasets/coral_soft_yolo` | Output directory |
-| `--split` | `0.7/0.15/0.15` | Train/val/test ratios (must sum to 1) |
-| `--seed` | `42` | Random seed |
-| `--overwrite` | `False` | Overwrite existing output |
-
-### `3_train_baseline.py`
-
-| Argument | Default | Description |
-|---|---|---|
-| `--model` | `yolov8s` | Model alias (see table above) |
-| `--resume` | `None` | Path to `last.pt` to resume |
-| `--data` | `configs/coral_soft.yaml` | Dataset YAML |
-| `--epochs` | `100` | Training epochs |
-| `--imgsz` | `640` | Input image size |
-| `--batch` | `16` | Batch size (`-1` = auto) |
-| `--optimizer` | `AdamW` | Optimizer |
-| `--lr0` | `0.001` | Initial learning rate |
-| `--device` | `0` | CUDA device or `cpu` |
-| `--workers` | `0` | Dataloader workers (0 = safe on Windows) |
-| `--project` | `runs/coral_benchmark` | Output root |
-| `--name` | auto | Run name |
-
-### `4_evaluate.py`
-
-| Argument | Default | Description |
-|---|---|---|
-| `--weights` | *(required)* | Path to `best.pt` |
-| `--split` | `test` | Dataset split to evaluate |
-| `--imgsz` | `640` | Inference image size |
-| `--conf` | `0.25` | Confidence threshold |
-| `--iou` | `0.5` | IoU threshold |
-
----
-
-## Project Structure
-
-```
-LightCoral-YOLO/
-├── data/
-│   └── coral_soft/               # Raw dataset (annotations + images)
-├── datasets/
-│   └── coral_soft_yolo/          # Prepared YOLO dataset (generated)
-├── configs/
-│   └── coral_soft.yaml           # Ultralytics dataset config
-├── scripts/
-│   ├── 0_analyze_dataset.py      # Dataset statistics & validation
-├── ├── 1_prepare_dataset.py      # Convert + split pipeline
-│   ├── 3_train_baseline.py       # YOLO training script (single model)
-│   ├── 4_evaluate.py             # Evaluation & metrics export
-│   └── run_benchmark.ps1         # Multi-model benchmark runner (PowerShell)
-├── runs/                         # Training outputs (generated)
-├── coco2yolo.py                  # Original author converter (COCO format)
-├── requirements.txt
-└── README.md
-```
-
----
-
-## Notes
-
-- **EXIF orientation** is handled automatically in `1_prepare_dataset.py`. Images with orientation 6/8 (40 images) have their effective width/height swapped before normalizing bbox coordinates.
-- **Imbalanced classes**: Sinularia has 4× more bboxes than Platygyra. Consider class-weighted loss or oversampling if needed.
-- **Small dataset**: Only 646 images. Pretrained COCO weights + strong augmentation are important to avoid overfitting.
-- **Windows**: `--workers 0` is default to avoid multiprocessing issues with PyTorch DataLoader on Windows.
+- Dùng ④ (PG-DAM) làm lệch index layer → pretrained COCO chỉ nạp được một phần theo tên/shape khớp; nếu cần tối đa hóa transfer, remap state_dict theo thứ tự layer trước khi load.
+- `torch.use_deterministic_algorithms` có thể cảnh báo với vài op CUDA — đã đặt `warn_only=True`.
+- Phiên bản Ultralytics cần khớp `requirements.txt`; nếu nâng cấp, kiểm tra lại chữ ký `DetectionModel.loss` và `preprocess_batch`.
+</aside>

@@ -1,0 +1,81 @@
+# cfg/module_specs.yaml
+# Sieu tham so mac dinh cho 5 module va mapping preset -> to hop module.
+
+modules:
+  # 1) Shallow-feature retention (AMCF + shallow-fusion) - faithful SF-YOLO
+  shallow:
+    id: 1
+    yaml_variant: cfg/base_yolov12n_shallow.yaml  # YAML faithful 2-head (P4/P5 o 80x80 + 40x40)
+    amcf_replace_idx: 7         # Conv placeholder -> build_model va thanh AMCF
+    amcf_stride: 1              # AMCF KHONG downsample (faithful): backbone 640->320->160->80->40
+
+  # 2) Spatial-Frequency Dual-domain Fusion (faithful SF-YOLO Fig 3) - 4 khoi
+  sfdf:
+    id: 2
+    replace_layer_idxs: [2, 4, 6, 8]  # 4 khoi dac trung backbone (P2/P3/P4/P5)
+    swap_layer_idxs: [6, 8]           # 2 khoi sau dao ti le split (spatial=3C/4)
+    reduction: 8                # channel-attention reduction (nhanh spatial)
+    pconv_kernel: 3             # pinwheel conv tren 4 subband DWT ghep
+
+  # 3) Physics-based degradation augmentation
+  physics_aug:
+    id: 3
+    prob: 0.5                   # xac suat ap dung moi anh train
+    beta_range:                 # he so suy giam beta_c theo kenh (R hap thu manh nhat)
+      R: [0.8, 2.0]
+      G: [0.3, 1.0]
+      B: [0.2, 0.8]
+    background_light: [0.4, 0.9]  # B_c ~ U(range), thien ve xanh luc/lam
+    depth_range: [0.5, 3.0]       # d (m) gia lap qua depth map don gian
+    depth_mode: vertical_gradient # vertical_gradient | constant | radial
+
+  # 4) PG-DAM (Physics-Guided Degradation-Aware Modulation)
+  pg_dam:
+    id: 4
+    insert_after_idx: 0         # chen sau stem Conv (idx 0)
+    z_dim: 7                    # z = {beta_R, beta_G, beta_B, B_R, B_G, B_B, t}
+    hidden: 32                  # FC hidden cua LDE
+    loss_weight: 0.05           # he so L_deg trong tong loss
+
+  # 5) FGA2 (Frequency-Gated Area-Attention)
+  fga2:
+    id: 5
+    replace_layer_idxs: [11, 14]  # 2 khoi A2C2f top-down trong neck
+    area: 4                       # so vung area-attention (l=4)
+    lambda_init: 0.0              # khoi tao lambda=0 => hanh vi ~ A2C2f goc
+
+# Preset -> to hop module (bang 6.1 trong de xuat)
+presets:
+  B0: []            # baseline thuan
+  E1: [3]           # chi physics aug
+  E2: [1]           # chi shallow P2
+  E3: [2]           # chi SFDF
+  E4: [1, 2]
+  E5: [1, 2, 3]
+  E6: [1, 2, 3, 4]
+  E7: [1, 2, 3, 5]
+  E8: [1, 2, 3, 4, 5]  # full SC-YOLO12
+
+train_defaults:
+  imgsz: 640
+  epochs: 100
+  patience: 0
+  batch: 16
+  optimizer: auto      
+  lr0: 0.01            
+  lrf: 0.01
+  weight_decay: 0.0005
+  warmup_epochs: 3
+  # Augmentation
+  mosaic: 1.0
+  flipud: 0
+  fliplr: 0.5
+  degrees: 0
+  hsv_h: 0.015
+  hsv_s: 0.7
+  hsv_v: 0.4
+  # Runtime
+  device: "0"
+  workers: 4           
+  pretrained: yolo12n.pt
+  seeds: [0, 1, 2]
