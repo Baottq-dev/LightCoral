@@ -1,0 +1,26 @@
+# coral_dataset.yaml
+# ============================================================
+# Dataset config cho training YOLOv12-F3M.
+# Sua 'path' va danh sach lop cho dung dataset cua ban.
+# Vi du nay theo SCoralDet (6 lop) trong bai bao.
+# ============================================================
+
+# Thu muc goc cua dataset (duong dan tuyet doi hoac tuong doi voi ./datasets)
+path: D:\Object Detection\Code\LightCoral\benchmark\ScoralDet_yolo
+
+# Thu muc anh (tuong doi voi 'path'). Nhan (labels) lay tu thu muc 'labels'
+# tuong ung theo dung quy uoc YOLO (images/.. -> labels/..).
+train: images/train
+val:   images/val
+test:  images/test   # tuy chon
+
+# So lop va ten lop
+# --- SCoralDet (6 lop, theo bai bao) ---
+nc: 6
+names:
+  0: Euphflfiaancora   # Soft coral (feathery)
+  1: Favosites         # Brain-like coral
+  2: Platygyra         # Maze coral
+  3: Sarcophyton       # Leather coral
+  4: Sinularia         # Finger coral
+  5: WavingHand        # Waving hand coral
