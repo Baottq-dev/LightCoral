@@ -1,0 +1,37 @@
+# benchmark/f3m/base_f3m_yolo11n.yaml
+# YOLO11n + F3M: chen F3MWithSA(stem, sau Conv#0) va F3M(deep, truoc SPPF).
+# build_f3m.py va kenh scale tuong minh [c1, c1, r, gate] vao 2 node F3M (idx 1 va 10).
+nc: 6
+scales:
+  # [depth, width, max_channels]
+  n: [0.50, 0.25, 1024]
+
+backbone:
+  - [-1, 1, Conv, [64, 3, 2]]              # 0  P1/2  -> 16
+  - [-1, 1, F3MWithSA, [64, 0.33, True]]   # 1  (NEW) stem F3M, gate=T, +SA -> 16
+  - [-1, 1, Conv, [128, 3, 2]]             # 2  P2/4  -> 32
+  - [-1, 2, C3k2, [256, False, 0.25]]      # 3        -> 64
+  - [-1, 1, Conv, [256, 3, 2]]             # 4  P3/8  -> 64
+  - [-1, 2, C3k2, [512, False, 0.25]]      # 5        -> 128
+  - [-1, 1, Conv, [512, 3, 2]]             # 6  P4/16 -> 128
+  - [-1, 2, C3k2, [512, True]]             # 7        -> 128
+  - [-1, 1, Conv, [1024, 3, 2]]            # 8  P5/32 -> 256
+  - [-1, 2, C3k2, [1024, True]]            # 9        -> 256
+  - [-1, 1, F3M, [1024, 0.125, False]]     # 10 (NEW) pre-SPPF F3M, gate=F -> 256
+  - [-1, 1, SPPF, [1024, 5]]               # 11       -> 256
+  - [-1, 2, C2PSA, [1024]]                 # 12       -> 256
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, nearest]]   # 13
+  - [[-1, 7], 1, Concat, [1]]                  # 14  (goc [-1,6]; layer6 -> 7)
+  - [-1, 2, C3k2, [512, False]]                # 15
+  - [-1, 1, nn.Upsample, [None, 2, nearest]]   # 16
+  - [[-1, 5], 1, Concat, [1]]                  # 17  (goc [-1,4]; layer4 -> 5)
+  - [-1, 2, C3k2, [256, False]]                # 18  (P3/8-small)
+  - [-1, 1, Conv, [256, 3, 2]]                 # 19
+  - [[-1, 15], 1, Concat, [1]]                 # 20  (goc [-1,13]; layer13 -> 15)
+  - [-1, 2, C3k2, [512, False]]                # 21  (P4/16-medium)
+  - [-1, 1, Conv, [512, 3, 2]]                 # 22
+  - [[-1, 12], 1, Concat, [1]]                 # 23  (goc [-1,10]; layer10 -> 12)
+  - [-1, 2, C3k2, [1024, True]]                # 24  (P5/32-large)
+  - [[18, 21, 24], 1, Detect, [nc]]            # 25  (goc [16,19,22] -> [18,21,24])

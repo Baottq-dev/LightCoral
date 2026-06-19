@@ -1,0 +1,45 @@
+# benchmark/scoraldet/base_scoraldet.yaml
+# SCoralDet (Lu et al. 2025) tren base YOLOv10n. Diem cam (build_scoraldet va theo index nay):
+#   - C2f_MPFB backbone: idx 2, 4, 6   (C2f -> C2f_MPFB; Bottleneck conv -> MPFB)
+#   - VoVGSCSP neck    : idx 13,16,19,22 (C2f/C2fCIB -> VoVGSCSP)
+#   - GSConv neck      : idx 17 (Conv), 20 (SCDown) -> GSConv stride 2
+# Giu nguyen SCDown/SPPF/PSA va C2fCIB@8 cua YOLOv10n. Dual head (one2many+one2one) v10Detect.
+
+nc: 6  # SCoralDet Soft-Coral: Euphylliaancora, Favosites, Platygyra, Sarcophyton, Sinularia, WavingHand
+
+scales:
+  # [depth, width, max_channels] - YOLOv10n
+  n: [0.33, 0.25, 1024]
+
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv,    [64, 3, 2]]          # 0  P1/2
+  - [-1, 1, Conv,    [128, 3, 2]]         # 1  P2/4
+  - [-1, 3, C2f,     [128, True]]         # 2  (<- C2f_MPFB #1)
+  - [-1, 1, Conv,    [256, 3, 2]]         # 3  P3/8
+  - [-1, 6, C2f,     [256, True]]         # 4  (<- C2f_MPFB #2)
+  - [-1, 1, SCDown,  [512, 3, 2]]         # 5  P4/16
+  - [-1, 6, C2f,     [512, True]]         # 6  (<- C2f_MPFB #3)
+  - [-1, 1, SCDown,  [1024, 3, 2]]        # 7  P5/32
+  - [-1, 3, C2fCIB,  [1024, True]]        # 8  (giu C2fCIB cua v10)
+  - [-1, 1, SPPF,    [1024, 5]]           # 9
+  - [-1, 1, PSA,     [1024]]              # 10
+
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 11
+  - [[-1, 6], 1, Concat, [1]]                     # 12
+  - [-1, 3, C2f, [512]]                           # 13  (<- VoVGSCSP)
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]]  # 14
+  - [[-1, 4], 1, Concat, [1]]                     # 15
+  - [-1, 3, C2f, [256]]                           # 16  P3/8 (<- VoVGSCSP)
+
+  - [-1, 1, Conv, [256, 3, 2]]                    # 17  (<- GSConv s2)
+  - [[-1, 13], 1, Concat, [1]]                    # 18
+  - [-1, 3, C2f, [512]]                           # 19  P4/16 (<- VoVGSCSP)
+
+  - [-1, 1, SCDown, [512, 3, 2]]                  # 20  (<- GSConv s2)
+  - [[-1, 10], 1, Concat, [1]]                    # 21
+  - [-1, 3, C2fCIB, [1024, True]]                 # 22  P5/32 (<- VoVGSCSP)
+
+  - [[16, 19, 22], 1, v10Detect, [nc]]            # 23  Detect(P3, P4, P5) - dual head

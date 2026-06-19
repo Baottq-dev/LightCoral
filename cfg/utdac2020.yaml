@@ -1,0 +1,16 @@
+# cfg/utdac2020.yaml
+# UTDAC2020 - Underwater Target Detection and Counting (4 classes)
+# Train giu nguyen tu train2017; val2017 chia 1:1 thanh val + test.
+# Ultralytics TU suy ra duong dan nhan: thay 'images' -> 'labels' trong path.
+
+path: f:/LightCoral-YOLO/datasets/utdac2020_yolo
+train: images/train
+val:   images/val
+test:  images/test
+
+nc: 4
+names:
+  0: echinus
+  1: starfish
+  2: holothurian
+  3: scallop

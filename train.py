@@ -142,7 +142,7 @@ def main():
     ap.add_argument("--batch", type=int, default=None)
     ap.add_argument("--weights", default=None, help="mac dinh theo module_specs.yaml")
     ap.add_argument("--specs", default=str(ROOT / "cfg" / "module_specs.yaml"))
-    ap.add_argument("--project", default=str(ROOT / "runs" / "scyolo12"))  # tuyet doi -> tranh bi long runs/detect/...
+    ap.add_argument("--project", default=str(ROOT / "runs" / "scyolo12"))  
     ap.add_argument("--device", default=None)
     # Training hyperparameters
     ap.add_argument("--optimizer",     type=str,   default=None,
@@ -172,14 +172,20 @@ def main():
     set_seed(args.seed)               # python/numpy/torch + cudnn deterministic
     register_custom_modules()         # PHAI goi truoc khi parse YAML model
 
+    # Doc nc tu data YAML (linh hoat cho nhieu bo du lieu)
+    data_cfg = yaml.safe_load(Path(args.data).read_text(encoding="utf-8"))
+    nc = data_cfg.get("nc", 6)
+
     # so module 3 (aug) khong doi kien truc; YAML chi phu thuoc {1,2,4,5}
-    model_yaml = build_yaml_for_modules(mods, specs, nc=6)
+    model_yaml = build_yaml_for_modules(mods, specs, nc=nc)
 
     tag = "".join(str(m) for m in sorted(mods)) or "0"
+    data_tag = Path(args.data).stem            # vd: 'utdac2020', 'coral_soft_yolo'
     name = args.preset or f"M{tag}"
+    run_name = f"{name}_{data_tag}_s{args.seed}"
 
     # ---- Luu log console giong M1_s42.txt: tee stdout+stderr ra file trong run dir ----
-    run_dir = Path(args.project) / f"{name}_s{args.seed}"
+    run_dir = Path(args.project) / run_name
     run_dir.mkdir(parents=True, exist_ok=True)
     log_path = Path(args.logfile) if args.logfile else run_dir / "train_log.txt"
     _log_fh = open(log_path, "w", encoding="utf-8", buffering=1)
@@ -223,7 +229,7 @@ def main():
         seed=args.seed,
         deterministic=True,
         project=args.project,
-        name=f"{name}_s{args.seed}",
+        name=run_name,
         exist_ok=True,
     )
 
