@@ -31,6 +31,24 @@ except ImportError:
 from train import _Tee                      # tai dung tee-log (root/train.py)
 from utils.seed import set_seed
 
+# Gia tri mac dinh APT (khop voi SCoralDetTrainer.APT_POWER / APT_THR)
+APT_POWER_DEFAULT: float = 2.0
+APT_THR_DEFAULT: float = 0.5
+
+
+def _apt_init_criterion(model):
+    """Module-level function (picklable) thay cho lambda."""
+    return v10APTDetectionLoss(model, power=model._apt_power, thr=model._apt_thr)
+
+
+def _patch_apt(model, power: float, thr: float):
+    """Gan _apt_power/_apt_thr va override init_criterion len model instance.
+    Phai goi sau moi lan load model (get_model, final_eval, eval script)."""
+    model._apt_power = power
+    model._apt_thr = thr
+    model.init_criterion = types.MethodType(_apt_init_criterion, model)
+
+
 
 class SCoralDetTrainer(DetectionTrainer):
     """DetectionTrainer chuan nhung thay loss = v10APTDetectionLoss (APT label assignment).
@@ -41,12 +59,27 @@ class SCoralDetTrainer(DetectionTrainer):
 
     def get_model(self, cfg=None, weights=None, verbose=True):
         model = super().get_model(cfg=cfg, weights=weights, verbose=verbose)
-        power, thr = self.APT_POWER, self.APT_THR
-        # override init_criterion -> v10APTDetectionLoss (giu chu ky preds dict one2many/one2one)
-        model.init_criterion = types.MethodType(
-            lambda m: v10APTDetectionLoss(m, power=power, thr=thr), model
-        )
+        _patch_apt(model, self.APT_POWER, self.APT_THR)
         return model
+
+    def save_model(self):
+        """Strip init_criterion truoc khi save checkpoint.
+
+        Ultralytics save_model() serialize deepcopy(self.ema.ema), KHONG phai
+        self.model truc tiep. ema.ema la deep-copy cua model sau _patch_apt,
+        nen no cung co init_criterion/_apt_* trong __dict__.
+        Phai strip ca 2 truoc khi super().save_model() chay, khoi phuc sau.
+        """
+        _STRIP = ("init_criterion", "_apt_power", "_apt_thr")
+        targets = [self.model]
+        if hasattr(self, "ema") and hasattr(self.ema, "ema") and self.ema.ema is not None:
+            targets.append(self.ema.ema)
+        saved = [{k: t.__dict__.pop(k) for k in _STRIP if k in t.__dict__} for t in targets]
+        try:
+            super().save_model()
+        finally:
+            for t, s in zip(targets, saved):
+                t.__dict__.update(s)   # khoi phuc de tiep tuc train
 
 
 def main():
@@ -116,6 +149,7 @@ def main():
         project=args.project,
         name=f"{args.name}_s{args.seed}",
         exist_ok=True,
+        plots=True,
     )
     if args.paper_protocol:
         # SCoralDet Sec 4.2: 300ep, batch32, SGD lr0.01 momentum0.937, scale 0.5, translate 0.1

@@ -19,10 +19,45 @@ from ultralytics.utils.torch_utils import get_num_params, get_flops
 # ho tro chay ca '-m benchmark.scoraldet.eval_scoraldet' lan 'python benchmark/scoraldet/eval_scoraldet.py'
 try:
     from benchmark.scoraldet.build_scoraldet import register_scoraldet_modules
+    from benchmark.scoraldet.train_scoraldet import _apt_init_criterion, _patch_apt, APT_POWER_DEFAULT, APT_THR_DEFAULT
 except ImportError:
     from build_scoraldet import register_scoraldet_modules
+    from train_scoraldet import _apt_init_criterion, _patch_apt, APT_POWER_DEFAULT, APT_THR_DEFAULT
 
 ROOT = Path(__file__).resolve().parents[2]
+
+
+def _save_metrics(metrics, model, split, save_dir):
+    """Luu metrics_<split>.csv + metrics_<split>.json - khop dinh dang test.py."""
+    import csv, json
+    save_dir = Path(save_dir)
+    save_dir.mkdir(parents=True, exist_ok=True)
+    box = metrics.box
+    names = model.names if isinstance(model.names, dict) else {i: n for i, n in enumerate(model.names)}
+    header = ["class_id", "class_name", "precision", "recall", "mAP50", "mAP50-95"]
+    rows = []
+    for i, ci in enumerate(box.ap_class_index):
+        p, r, ap50, ap = box.class_result(i)
+        rows.append([int(ci), names.get(int(ci), str(ci)),
+                     f"{p:.6f}", f"{r:.6f}", f"{ap50:.6f}", f"{ap:.6f}"])
+    all_row = ["ALL", "all", f"{box.mp:.6f}", f"{box.mr:.6f}",
+               f"{box.map50:.6f}", f"{box.map:.6f}"]
+    csv_path = save_dir / f"metrics_{split}.csv"
+    with csv_path.open("w", newline="", encoding="utf-8") as f:
+        csv.writer(f).writerows([header] + rows + [all_row])
+    summary = {
+        "split": split,
+        "map50_95": float(box.map), "map50": float(box.map50),
+        "map75": float(box.map75) if hasattr(box, "map75") else None,
+        "precision": float(box.mp), "recall": float(box.mr),
+        "per_class_map50_95": {
+            names.get(int(ci), str(ci)): float(box.maps[int(ci)])
+            for ci in box.ap_class_index
+        },
+    }
+    json_path = save_dir / f"metrics_{split}.json"
+    json_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"Metrics saved -> {csv_path}  |  {json_path}")
 
 
 def _reparam(model):
@@ -50,13 +85,35 @@ def main():
     args = ap.parse_args()
 
     register_scoraldet_modules()        # PHAI goi truoc khi load checkpoint custom
-    model = YOLO(args.weights)
+
+    # Checkpoint cu (train chua co save_model fix) luu init_criterion nhu:
+    #   (getattr, (model, '_apt_init_criterion'))
+    # Khi torch.load, pickle goi getattr(model, '_apt_init_criterion') nhung
+    # DetectionModel khong co attr do -> AttributeError.
+    # Fix: them tam _apt_init_criterion len class DetectionModel truoc khi load,
+    # xoa ngay sau de giu class sach.
+    from ultralytics.nn.tasks import DetectionModel as _DetModel
+    _DetModel._apt_init_criterion = _apt_init_criterion
+    try:
+        model = YOLO(args.weights)
+    finally:
+        try:
+            delattr(_DetModel, "_apt_init_criterion")
+        except AttributeError:
+            pass
+
+    # Dam bao _apt_power/_apt_thr co san (checkpoint moi khong luu chung nua)
+    _patch_apt(model.model, power=APT_POWER_DEFAULT, thr=APT_THR_DEFAULT)
+
+    save_dir = Path(args.project) / args.name
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     metrics = model.val(
         data=args.data, split=args.split, imgsz=args.imgsz, batch=args.batch,
-        device=args.device, project=args.project, name=args.name,
-        exist_ok=True, verbose=True,
+        device=args.device, project=str(save_dir.parent), name=save_dir.name,
+        exist_ok=True, verbose=True, plots=True, save_json=False,
     )
+    _save_metrics(metrics, model, args.split, save_dir)
     b = metrics.box
     n_par = get_num_params(model.model)
     gflops = get_flops(model.model, imgsz=args.imgsz)

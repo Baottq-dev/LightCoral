@@ -92,6 +92,7 @@ def main():
         project=args.project,
         name=f"{args.name}_s{args.seed}",
         exist_ok=True,
+        plots=True,
     )
 
     trainer = DetectionTrainer(overrides=overrides)

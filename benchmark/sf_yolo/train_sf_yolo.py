@@ -41,7 +41,7 @@ def main():
                     help="pretrained khoi tao (chi nap layer khop ten+shape: stem + vai Conv)")
     ap.add_argument("--specs", default=str(ROOT / "cfg" / "module_specs.yaml"))
     ap.add_argument("--project", default=str(ROOT / "benchmark" / "runs"))
-    ap.add_argument("--name", default="SFYOLO")
+    ap.add_argument("--name", default="SF_YOLO")
     ap.add_argument("--logfile", default=None)
     args = ap.parse_args()
 
@@ -89,6 +89,7 @@ def main():
         project=args.project,
         name=f"{args.name}_s{args.seed}",
         exist_ok=True,
+        plots=True,
     )
 
     trainer = DetectionTrainer(overrides=overrides)
