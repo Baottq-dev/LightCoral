@@ -81,6 +81,7 @@ runs/
 # Datasets (usually large; track with DVC or similar)
 datasets/
 data/
+*.zip
 
 # ============================================================
 # Deep Learning / ML
@@ -141,3 +142,6 @@ temp/
 secrets.*
 *.key
 *.pem
+
+
+docs/
