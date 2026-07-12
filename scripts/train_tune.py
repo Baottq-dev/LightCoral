@@ -18,7 +18,7 @@ from augment.physics_degradation import from_specs
 from engine.build_model import ROOT, build_yaml_for_modules
 from engine.losses import DegradationLoss, SCDetectionModel
 from models.registry import register_custom_modules
-from utils.seed import set_seed
+from utils.seed import make_generator, set_seed
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -267,12 +267,21 @@ def main():
     trainer.sc_modules = mods
     trainer.sc_specs = specs
     if 3 in mods:
-        trainer.physics_aug = from_specs(specs)
+        trainer.physics_aug = from_specs(specs, generator=make_generator(args.seed))
     try:
         trainer.train()
     finally:
+        # QUAN TRONG: tra stdout/stderr ve stream THAT truoc khi dong file log.
+        # Neu khong, luc interpreter shutdown Python flush sys.stdout (van la _Tee)
+        # -> ghi vao file da dong -> raise -> "Exception ignored" + exit code 120
+        # (train van xong nhung code 120 lam driver tuong that bai va dung lai).
         sys.stdout.flush()
         sys.stderr.flush()
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
+        for _h in LOGGER.handlers:
+            if hasattr(_h, "setStream"):
+                _h.setStream(sys.__stderr__)
         if not _log_fh.closed:
             _log_fh.close()
 

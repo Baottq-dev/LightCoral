@@ -17,7 +17,7 @@ from augment.physics_degradation import from_specs
 from engine.build_model import ROOT, build_yaml_for_modules
 from engine.losses import DegradationLoss, SCDetectionModel
 from models.registry import register_custom_modules
-from utils.seed import set_seed
+from utils.seed import make_generator, set_seed
 
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
@@ -182,7 +182,7 @@ def main():
     tag = "".join(str(m) for m in sorted(mods)) or "0"
     data_tag = Path(args.data).stem            # vd: 'utdac2020', 'coral_soft_yolo'
     name = args.preset or f"M{tag}"
-    run_name = f"{name}_{data_tag}_s{args.seed}"
+    run_name = f"{name}_{data_tag}_s{args.seed}_ep{args.epochs}_lr0{args.lr0}_lrf{args.lrf}_config1"
 
     # ---- Luu log console giong M1_s42.txt: tee stdout+stderr ra file trong run dir ----
     run_dir = Path(args.project) / run_name
@@ -237,7 +237,7 @@ def main():
     trainer.sc_modules = mods
     trainer.sc_specs = specs
     if 3 in mods:
-        trainer.physics_aug = from_specs(specs)
+        trainer.physics_aug = from_specs(specs, generator=make_generator(args.seed))
     try:
         trainer.train()
     finally:

@@ -80,7 +80,7 @@ if __name__ == "__main__":
     ap.add_argument("--pattern", default="*.jpg")
     args = ap.parse_args()
 
-    names = ["Euphyllia", "Favosites", "Platygyra", "Sarcophyton", "Sinularia", "Wavinghand"]
+    names = ["Euphflfiaancora", "Favosites", "Platygyra", "Sarcophyton", "Sinularia", "WavingHand"]
     folds = make_folds(args.images, args.k, args.groups_csv, args.pattern)
     paths = write_fold_yaml(folds, names, args.out, base_data={"path": "."})
     print("Da tao", len(paths), "fold:")

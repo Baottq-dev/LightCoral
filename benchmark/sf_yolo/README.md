@@ -31,18 +31,90 @@ SFDF nội bộ dùng lại `ChannelAttention`, `DSA`, `PinwheelConv`, `HaarDWT`
 ```bash
 # 1) Smoke-test build: forward 640, kiem 2 head + stride [8,16] + NaN, in params
 python -m benchmark.sf_yolo.build_sf_yolo
+```
 
-# 2) Train 1 seed (CUNG split/imgsz voi SC-YOLO12)
-python -m benchmark.sf_yolo.train_sf_yolo --data data/scoraldet_fold0.yaml --seed 0
+### Train — tham số cơ bản
 
-# 3) Multi-seed [0,1,2] (mean +/- std)
+```bash
+# Chạy mặc định theo paper (imgsz=736, batch=16, SGD, 300ep, seed=0)
+python -m benchmark.sf_yolo.train_sf_yolo --data data/scoraldet_fold0.yaml
+
+# Dùng seed khác
+python -m benchmark.sf_yolo.train_sf_yolo --data data/scoraldet_fold0.yaml --seed 1
+
+# Train từ scratch (giống điều kiện gốc paper — không pretrained)
+python -m benchmark.sf_yolo.train_sf_yolo --data data/scoraldet_fold0.yaml --seed 0 --scratch
+
+# Chỉ định GPU
+python -m benchmark.sf_yolo.train_sf_yolo --data data/scoraldet_fold0.yaml --device 0
+```
+
+### Train — tất cả CLI args (ghi đè hyperparameter paper khi cần)
+
+```bash
+python -m benchmark.sf_yolo.train_sf_yolo \
+    --data         data/scoraldet_fold0.yaml \  # [BẮT BUỘC] data YAML với split cố định
+    --seed         0            \  # hạt giống (mặc định=0; dùng 0/1/2 cho multi-seed)
+    --epochs       300          \  # số epoch (paper=300, cố định)
+    --imgsz        736          \  # kích thước ảnh đầu vào (paper=736×736, cố định)
+    --batch        16           \  # kích thước lô (paper=16, cố định)
+    --optimizer    SGD          \  # bộ tối ưu (paper=SGD, cố định)
+    --lr0          0.01         \  # tốc độ học ban đầu (paper=0.01)
+    --lrf          0.01         \  # tốc độ học cuối cùng (paper=0.01)
+    --weight-decay 0.0005       \  # phân rã trọng số (paper=0.0005)
+    --momentum     0.937        \  # động lượng SGD (paper=0.937)
+    --weights      yolo11n.pt   \  # pretrained khởi tạo — stem + vài Conv khớp tên
+    --scratch                   \  # flag: train từ đầu (bỏ --weights)
+    --device       0            \  # GPU id (mặc định: td["device"])
+    --workers      4            \  # số DataLoader workers
+    --project      benchmark/runs \  # thư mục lưu kết quả
+    --name         SF_YOLO      \  # tên run (thực tế = SF_YOLO_s<seed>)
+    --logfile      path/to/log.txt   # tuỳ chọn: ghi log ra file riêng
+```
+
+### Multi-seed (báo mean ± std)
+
+```bash
 for s in 0 1 2; do
   python -m benchmark.sf_yolo.train_sf_yolo --data data/scoraldet_fold0.yaml --seed $s
 done
-
-# 4) Tuy chon: tu scratch giong dieu kien goc paper (danh dau rieng trong bang)
-python -m benchmark.sf_yolo.train_sf_yolo --data data/scoraldet_fold0.yaml --seed 0 --scratch
 ```
+
+### Đánh giá trên test split
+
+```bash
+# Cơ bản
+python -m benchmark.sf_yolo.eval_sf_yolo \
+    --data    data/scoraldet_fold0.yaml \
+    --weights benchmark/runs/SF_YOLO_s0/weights/best.pt
+
+# Đầy đủ args
+python -m benchmark.sf_yolo.eval_sf_yolo \
+    --data    data/scoraldet_fold0.yaml \
+    --weights benchmark/runs/SF_YOLO_s0/weights/best.pt \
+    --split   test   \   # test | val | train
+    --imgsz   640    \   # dùng 640 khi eval dù train ở 736 (tránh OOM)
+    --batch   16     \
+    --device  0      \
+    --project benchmark/runs \
+    --name    SF_YOLO_eval
+```
+
+> **Log:** lưu tại `benchmark/runs/SF_YOLO_s<seed>/train_log.txt` (tee-log giống SC-YOLO12).  
+> **Kết quả eval:** `metrics_test.csv` + `metrics_test.json` trong `benchmark/runs/SF_YOLO_eval/`.
+
+### Siêu tham số paper (cố định)
+
+| Tham số | Giá trị | Ghi chú |
+|---|---|---|
+| `imgsz` | 736 | 736×736 px |
+| `batch` | 16 | cố định |
+| `optimizer` | SGD | cố định |
+| `lr0` | 0.01 | học ban đầu |
+| `lrf` | 0.01 | học cuối |
+| `weight_decay` | 0.0005 | phân rã |
+| `momentum` | 0.937 | động lượng SGD |
+| `epochs` | 300 | cố định |
 
 Log console lưu tại `runs/benchmark/SFYOLO_s<seed>/train_log.txt` (tee-log giống SC-YOLO12). Sau khi chạy đủ seed, dùng `eval/` (bootstrap CI, corrected t-test) để so với cấu hình SC-YOLO12 tốt nhất (M5).
 

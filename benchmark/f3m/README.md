@@ -2,19 +2,111 @@
 
 Reimplement **F3M** (Frequency-domain Feature Fusion Module, Wang et al., *J. Mar. Sci. Eng.* 2026, 14, 20) trên base **YOLO11n** làm đối thủ benchmark cho SC-YOLO12 trên Soft-Coral. F3M là khối *plug-and-play* giữ nguyên kênh, **không thêm loss phụ** — tối ưu hoàn toàn qua detection loss chuẩn.
 
-## Cách chạy
+## Cách chạy (từ root repo `sc-yolo12/`)
 
 ```bash
-# Smoke-test build (forward 640, kiem 3 head + stride + params ~2.61M)
-python benchmark/f3m/build_f3m.py
+# 1) Smoke-test build (forward 640, kiem 3 head + stride [8,16,32] + params ~2.61M)
+python -m benchmark.f3m.build_f3m
 
-# Smoke-test rieng module (params ~0.026M, giu shape)
-python benchmark/f3m/modules_f3m.py
-
-# Train (cung split + protocol voi SC-YOLO12)
-python -m benchmark.f3m.train_f3m --data data/scoraldet_fold0.yaml --seed 0
-python -m benchmark.f3m.train_f3m --data ... --seed 0 --scratch   # tu scratch nhu paper
+# 2) Smoke-test rieng module (params ~0.026M, giu shape)
+python -m benchmark.f3m.modules_f3m
 ```
+
+### Train — tham số cơ bản
+
+```bash
+# Chạy mặc định theo paper (seed=42, imgsz=640, batch=16, optimizer=auto, 100ep)
+python -m benchmark.f3m.train_f3m --data data/scoraldet_fold0.yaml
+
+# Chỉ định epochs (epochs là tham số linh hoạt duy nhất theo dataset)
+python -m benchmark.f3m.train_f3m --data data/scoraldet_fold0.yaml --epochs 200
+
+# Train từ scratch (giống điều kiện gốc paper — không dùng pretrained)
+python -m benchmark.f3m.train_f3m --data data/scoraldet_fold0.yaml --scratch
+
+# Chỉ định GPU và số workers
+python -m benchmark.f3m.train_f3m --data data/scoraldet_fold0.yaml --device 0 --workers 4
+```
+
+### Train — tất cả CLI args (ghi đè hyperparameter paper khi cần)
+
+```bash
+python -m benchmark.f3m.train_f3m \
+    --data          data/scoraldet_fold0.yaml \  # [BẮT BUỘC] data YAML chứa split cố định
+    --seed          42          \  # hạt giống ngẫu nhiên (paper=42, giữ cố định toàn bộ)
+    --epochs        100         \  # số epoch — LINH HOẠT theo dataset (mặc định: td["epochs"])
+    --imgsz         640         \  # kích thước ảnh đầu vào (paper=640×640)
+    --batch         16          \  # kích thước lô (paper=16)
+    --optimizer     auto        \  # bộ tối ưu Adam-based (paper=auto)
+    --lr0           0.01        \  # tốc độ học ban đầu (paper=0.01)
+    --lrf           0.01        \  # tốc độ học cuối cùng (paper=0.01)
+    --weight-decay  0.0005      \  # phân rã trọng số (paper=0.0005)
+    --momentum      0.937       \  # động lượng (paper=0.937)
+    --fliplr        0.5         \  # lật ngang ngẫu nhiên xác suất 50%
+    --hsv-h         0.015       \  # biên độ hue HSV ±1.5%
+    --hsv-s         0.7         \  # biên độ saturation HSV ±70%
+    --hsv-v         0.4         \  # biên độ brightness HSV ±40%
+    --scale         0.5         \  # co giãn ngẫu nhiên 0.5–1.0
+    --translate     0.1         \  # dịch chuyển ngẫu nhiên tối đa 10%
+    --erasing       0.4         \  # random erasing kết hợp RandAugment (p=0.4)
+    --weights       yolo11n.pt  \  # pretrained khởi tạo (bỏ qua khi --scratch)
+    --device        0           \  # GPU id (mặc định: td["device"])
+    --workers       4           \  # số DataLoader workers (mặc định: td["workers"])
+    --project       benchmark/runs \  # thư mục lưu kết quả
+    --name          F3M         \  # tên run (thực tế = F3M_s<seed>)
+    --logfile       path/to/log.txt   # tuỳ chọn: ghi log ra file riêng
+```
+
+### Multi-seed (báo mean ± std)
+
+```bash
+for s in 0 1 2; do
+  python -m benchmark.f3m.train_f3m --data data/scoraldet_fold0.yaml --seed $s
+done
+```
+
+### Đánh giá trên test split
+
+```bash
+# Cơ bản
+python -m benchmark.f3m.eval_f3m \
+    --data    data/scoraldet_fold0.yaml \
+    --weights benchmark/runs/F3M_s42/weights/best.pt
+
+# Đầy đủ args
+python -m benchmark.f3m.eval_f3m \
+    --data    data/scoraldet_fold0.yaml \
+    --weights benchmark/runs/F3M_s42/weights/best.pt \
+    --split   test   \   # test | val | train
+    --imgsz   640    \
+    --batch   16     \
+    --device  0      \
+    --project benchmark/runs \
+    --name    F3M_eval
+```
+
+> **Log:** lưu tại `benchmark/runs/F3M_s<seed>/train_log.txt` (tee-log giống SC-YOLO12).  
+> **Kết quả eval:** `metrics_test.csv` + `metrics_test.json` trong `benchmark/runs/F3M_eval/`.
+
+### Siêu tham số paper (cố định)
+
+| Tham số | Giá trị | Ghi chú |
+|---|---|---|
+| `imgsz` | 640 | 640×640 px |
+| `batch` | 16 | cố định |
+| `optimizer` | auto | Adam-based |
+| `lr0` | 0.01 | học ban đầu |
+| `lrf` | 0.01 | học cuối |
+| `weight_decay` | 0.0005 | phân rã |
+| `momentum` | 0.937 | động lượng |
+| `seed` | 42 | toàn bộ lượt chạy |
+| `epochs` | **linh hoạt** | khác nhau theo dataset |
+| `fliplr` | 0.5 | lật ngang 50% |
+| `hsv_h/s/v` | 0.015 / 0.7 / 0.4 | HSV augment |
+| `scale` | 0.5 | co giãn 0.5–1.0 |
+| `translate` | 0.1 | dịch chuyển ≤10% |
+| `auto_augment` | randaugment | RandAugment (hardcode) |
+| `erasing` | 0.4 | random erasing p=0.4 |
 
 > **Lưu ý process:** registry chỉ patch `parse_model` **một lần** mỗi process. Chạy F3M ở process riêng (đừng import chung SF-YOLO/SCoralDet trong cùng phiên) để module F3M kịp vào `frozenset(CUSTOM_MODULES)` trước khi patch.
 > 

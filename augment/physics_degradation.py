@@ -45,7 +45,10 @@ class BatchPhysicsDegradation(nn.Module):
 
     # ---------- helpers ----------
     def _u(self, lo, hi, *shape, device):
-        r = torch.rand(*shape, device=device, generator=self.gen)
+        # self.gen la torch.Generator CPU (utils/seed.py:make_generator) de tai lap
+        # doc lap voi device train; torch.rand khong cho generator/device khac loai
+        # nen sample tren CPU roi chuyen ve device.
+        r = torch.rand(*shape, generator=self.gen).to(device)
         return lo + (hi - lo) * r
 
     def _depth(self, b, h, w, device):
@@ -82,8 +85,8 @@ class BatchPhysicsDegradation(nn.Module):
         assert c == 3
         device = imgs.device
 
-        # mask anh duoc augment
-        apply = torch.rand(b, device=device, generator=self.gen) < self.prob  # (B,)
+        # mask anh duoc augment (sample tren CPU nhu _u(), roi chuyen ve device)
+        apply = torch.rand(b, generator=self.gen).to(device) < self.prob  # (B,)
 
         # sample tham so vat ly per-image
         beta = torch.stack(

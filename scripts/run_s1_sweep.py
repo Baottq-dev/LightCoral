@@ -14,7 +14,7 @@ def fmt(x):
 # lr0 LONG theo optimizer (KHONG cross bua)
 OPTLR = [("SGD", 0.01), ("SGD", 0.005), ("AdamW", 0.002), ("AdamW", 0.001)]
 LRFS  = [0.01, 0.001]
-WDS   = [0.0005, 0.001]
+WDS   = [0.0005, 0.001, 0.005]  # bien tren mo rong: 517 anh train de overfit, can test wd manh hon
 COSES = [False, True]
 
 tag  = "".join(sorted(m.strip() for m in MODULES.split(",") if m.strip()))
@@ -39,7 +39,10 @@ for i, (opt, lr0, lrf, wd, cos) in enumerate(configs, 1):
         cmd.append("--cos_lr")
     print(f"[{i}/{len(configs)}] RUN: {run_name}")
     ret = subprocess.run(cmd)
-    if ret.returncode != 0:
-        print(f"  !! LOI ({ret.returncode}) o {run_name} — dung lai de kiem tra.")
+    ok = (PROJECT / run_name / "weights" / "best.pt").exists()
+    if not ok:
+        print(f"  !! That bai THAT SU o {run_name} (rc={ret.returncode}); dung lai.")
         sys.exit(ret.returncode)
-print("\nHoan tat 32 run.")
+    if ret.returncode != 0:
+        print(f"  (bo qua) rc={ret.returncode} nhung best.pt da co -> chay tiep")
+print(f"\nHoan tat {len(configs)} run.")

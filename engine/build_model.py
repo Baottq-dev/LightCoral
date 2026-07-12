@@ -34,9 +34,7 @@ def _compute_channels(layers, width, max_ch):
     out = []
     for i, (f, n, m, args) in enumerate(layers):
         f0 = f[0] if isinstance(f, list) else f
-        c1 = out[f0] if (isinstance(f0, int) and f0 >= 0) else (out[f0] if out else ch[0])
-        if i == 0:
-            c1 = ch[0]
+        c1 = ch[0] if i == 0 else out[f0]   # out[f0] xu ly ca index am; i==0 chua co out
         if m in BUILTIN_SCALED:
             c2 = _scaled(args[0], width, max_ch)
         elif m in CUSTOM:

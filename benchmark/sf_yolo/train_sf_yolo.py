@@ -30,9 +30,24 @@ def main():
     ap = argparse.ArgumentParser("SF-YOLO faithful trainer (benchmark)")
     ap.add_argument("--data", required=True, help="data YAML (CUNG split co dinh voi SC-YOLO12)")
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--epochs", type=int, default=None)
-    ap.add_argument("--imgsz", type=int, default=None)
-    ap.add_argument("--batch", type=int, default=None)
+    # ---- Sieu tham so co dinh theo paper SF-YOLO ----
+    ap.add_argument("--epochs", type=int, default=300,
+                    help="so epoch huan luyen (paper=300, co dinh)")
+    ap.add_argument("--imgsz", type=int, default=736,
+                    help="kich thuoc anh dau vao (paper=736x736, co dinh)")
+    ap.add_argument("--batch", type=int, default=16,
+                    help="kich thuoc batch (paper=16, co dinh)")
+    ap.add_argument("--optimizer", type=str, default="SGD",
+                    help="bo toi uu hoa (paper=SGD, co dinh)")
+    ap.add_argument("--lr0", type=float, default=0.01,
+                    help="toc do hoc ban dau (paper=0.01, co dinh)")
+    ap.add_argument("--lrf", type=float, default=0.01,
+                    help="toc do hoc cuoi cung (paper=0.01, co dinh)")
+    ap.add_argument("--weight-decay", type=float, default=0.0005,
+                    help="he so phan ra trong so (paper=0.0005, co dinh)")
+    ap.add_argument("--momentum", type=float, default=0.937,
+                    help="he so dong luong SGD (paper=0.937, co dinh)")
+    # ---- Tham so runtime ----
     ap.add_argument("--device", default=None)
     ap.add_argument("--workers", type=int, default=None)
     ap.add_argument("--scratch", action="store_true",
@@ -68,19 +83,27 @@ def main():
         if hasattr(_h, "setStream") and getattr(_h, "stream", None) in (sys.__stdout__, sys.__stderr__):
             _h.setStream(sys.stderr)
 
+    # Sieu tham so co dinh theo paper SF-YOLO (Sec 4 / bang thuc nghiem):
+    #   batch=16, epochs=300, imgsz=736x736, SGD, lr0=0.01, lrf=0.01,
+    #   weight_decay=0.0005, momentum=0.937
     overrides = dict(
         model=str(model_yaml),
         data=args.data,
-        epochs=args.epochs or td["epochs"],
-        imgsz=args.imgsz or td["imgsz"],
-        batch=args.batch or td["batch"],
+        # --- Sieu tham so paper (co dinh, co the ghi de qua CLI) ---
+        epochs=args.epochs,           # 300
+        imgsz=args.imgsz,             # 736
+        batch=args.batch,             # 16
+        optimizer=args.optimizer,     # SGD
+        lr0=args.lr0,                 # 0.01
+        lrf=args.lrf,                 # 0.01
+        weight_decay=args.weight_decay,   # 0.0005
+        momentum=args.momentum,       # 0.937
+        # --- Lay tu train_defaults ---
         patience=td["patience"],
-        optimizer=td["optimizer"],
-        lr0=td["lr0"], lrf=td["lrf"],
-        weight_decay=td["weight_decay"],
         warmup_epochs=td["warmup_epochs"],
         mosaic=td["mosaic"], flipud=td["flipud"], fliplr=td["fliplr"],
         degrees=td["degrees"], hsv_h=td["hsv_h"], hsv_s=td["hsv_s"], hsv_v=td["hsv_v"],
+        # --- Runtime ---
         device=args.device if args.device is not None else td["device"],
         workers=args.workers if args.workers is not None else td["workers"],
         pretrained=False if args.scratch else args.weights,
@@ -98,6 +121,11 @@ def main():
     finally:
         sys.stdout.flush()
         sys.stderr.flush()
+        # Khoi phuc stdout/stderr goc TRUOC khi dong file.
+        # Neu khong, Python GC se co flush _Tee sau khi _log_fh da dong
+        # => "Exception ignored in: <train._Tee object>" khi thoat.
+        sys.stdout = sys.__stdout__
+        sys.stderr = sys.__stderr__
         if not _log_fh.closed:
             _log_fh.close()
 

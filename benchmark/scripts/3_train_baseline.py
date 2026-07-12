@@ -38,6 +38,11 @@ import argparse
 import sys
 from pathlib import Path
 
+# repo root (benchmark/scripts/ -> benchmark/ -> repo) tren sys.path de tai su dung _Tee
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 
 # ── Model registry ─────────────────────────────────────────────────────────────
 # Maps CLI alias → pretrained weights filename (auto-downloaded from ultralytics hub)
@@ -126,7 +131,6 @@ def parse_args():
                         help="Final learning rate factor (lr0 * lrf).")
     parser.add_argument("--weight_decay", type=float, default=0.0005)
     parser.add_argument("--warmup_epochs",type=int,   default=3)
-
     # ── Augmentation ───────────────────────────────────────────────────────────
     parser.add_argument("--mosaic",  type=float, default=1.0,
                         help="Mosaic augmentation probability.")
@@ -145,6 +149,8 @@ def parse_args():
                         help="CUDA device id (e.g. '0', '0,1') or 'cpu'.")
     parser.add_argument("--workers", type=int, default=0,
                         help="Dataloader workers. Use 0 on Windows to avoid multiprocessing issues.")
+    parser.add_argument("--seed",    type=int, default=0,
+                        help="Random seed (multi-seed benchmark for mean+/-std).")
 
     # ── Output ─────────────────────────────────────────────────────────────────
     parser.add_argument("--project", type=str, default="runs/coral_benchmark",
@@ -187,12 +193,12 @@ def main():
             print(f"[ERROR] Custom weights not found: {weights_path}")
             sys.exit(1)
         model    = _load_model(str(weights_path))
-        run_name = args.name or f"{weights_path.stem}_imgsz{args.imgsz}_ep{args.epochs}"
+        run_name = args.name or f"{weights_path.stem}_imgsz{args.imgsz}_ep{args.epochs}_lr0{args.lr0}_lrf{args.lrf}_s{args.seed}"
         print(f"Custom weights: {weights_path}")
     else:
         hub_weights = MODELS[args.model]
         model       = _load_model(hub_weights)
-        run_name    = args.name or f"{args.model}_imgsz{args.imgsz}_ep{args.epochs}"
+        run_name    = args.name or f"{args.model}_imgsz{args.imgsz}_ep{args.epochs}_lr0{args.lr0}_lrf{args.lrf}_s{args.seed}"
 
     data_path = Path(args.data)
     if not data_path.exists():
@@ -213,35 +219,60 @@ def main():
     # Ultralytics sẽ lưu vào runs/detect/runs/coral_benchmark/<name>/
     # ─────────────────────────────────────────────────────────────────────────
 
-    results = model.train(
-        data          = str(data_path),
-        epochs        = args.epochs,
-        imgsz         = args.imgsz,
-        batch         = args.batch,
-        optimizer     = args.optimizer,
-        lr0           = args.lr0,
-        lrf           = args.lrf,
-        weight_decay  = args.weight_decay,
-        warmup_epochs = args.warmup_epochs,
-        # Augmentation
-        mosaic        = args.mosaic,
-        flipud        = args.flipud,
-        fliplr        = args.fliplr,
-        degrees       = args.degrees,
-        hsv_h         = args.hsv_h,
-        hsv_s         = args.hsv_s,
-        hsv_v         = args.hsv_v,
-        # Runtime
-        device        = args.device,
-        workers       = args.workers,
-        # Output
-        project       = args.project,
-        name          = run_name,
-        save          = True,
-        plots         = True,
-        val           = True,
-        resume        = bool(args.resume),
-    )
+    # ── Log per-run giong train.py: tee stdout+stderr ra <run_dir>/train_log.txt ──
+    # Ultralytics them tien to "detect/" khi project la relative path.
+    from train import _Tee
+    from ultralytics.utils import LOGGER
+
+    run_dir = Path("runs/detect") / args.project / run_name
+    run_dir.mkdir(parents=True, exist_ok=True)
+    _log_fh = open(run_dir / "train_log.txt", "w", encoding="utf-8", buffering=1)
+    _log_fh.write("python " + " ".join(sys.argv) + "\n")
+    if sys.__stdout__ is not None:
+        sys.__stdout__.write(f"[log] Console -> {run_dir / 'train_log.txt'}\n")
+    sys.stdout = _Tee(sys.__stdout__, _log_fh)
+    sys.stderr = _Tee(sys.__stderr__, _log_fh)
+    for _h in LOGGER.handlers:
+        if hasattr(_h, "setStream") and getattr(_h, "stream", None) in (sys.__stdout__, sys.__stderr__):
+            _h.setStream(sys.stderr)
+
+    try:
+        results = model.train(
+            data          = str(data_path),
+            epochs        = args.epochs,
+            imgsz         = args.imgsz,
+            batch         = args.batch,
+            optimizer     = args.optimizer,
+            lr0           = args.lr0,
+            lrf           = args.lrf,
+            weight_decay  = args.weight_decay,
+            warmup_epochs = args.warmup_epochs,
+            # Augmentation
+            mosaic        = args.mosaic,
+            flipud        = args.flipud,
+            fliplr        = args.fliplr,
+            degrees       = args.degrees,
+            hsv_h         = args.hsv_h,
+            hsv_s         = args.hsv_s,
+            hsv_v         = args.hsv_v,
+            # Runtime
+            device        = args.device,
+            workers       = args.workers,
+            seed          = args.seed,
+            deterministic = True,
+            # Output
+            project       = args.project,
+            name          = run_name,
+            save          = True,
+            plots         = True,
+            val           = True,
+            resume        = bool(args.resume),
+        )
+    finally:
+        sys.stdout.flush()
+        sys.stderr.flush()
+        if not _log_fh.closed:
+            _log_fh.close()
 
     # ── Summary ────────────────────────────────────────────────────────────────
     map50    = results.results_dict.get("metrics/mAP50(B)", None)

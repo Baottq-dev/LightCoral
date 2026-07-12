@@ -16,13 +16,21 @@ if str(_ROOT_INIT) not in sys.path:
 from ultralytics import YOLO
 from ultralytics.utils.torch_utils import get_num_params, get_flops
 
-# ho tro chay ca '-m benchmark.scoraldet.eval_scoraldet' lan 'python benchmark/scoraldet/eval_scoraldet.py'
+_HERE = Path(__file__).resolve().parent  # .../benchmark/ScoralDet/
+# ho tro chay ca 3 tinh huong (ten thu muc ScoralDet / scoraldet / flat)
 try:
-    from benchmark.scoraldet.build_scoraldet import register_scoraldet_modules
-    from benchmark.scoraldet.train_scoraldet import _apt_init_criterion, _patch_apt, APT_POWER_DEFAULT, APT_THR_DEFAULT
-except ImportError:
-    from build_scoraldet import register_scoraldet_modules
-    from train_scoraldet import _apt_init_criterion, _patch_apt, APT_POWER_DEFAULT, APT_THR_DEFAULT
+    from benchmark.ScoralDet.build_scoraldet import register_scoraldet_modules
+    from benchmark.ScoralDet.train_scoraldet import _apt_init_criterion, _patch_apt, APT_POWER_DEFAULT, APT_THR_DEFAULT
+except ModuleNotFoundError:
+    try:
+        from benchmark.scoraldet.build_scoraldet import register_scoraldet_modules
+        from benchmark.scoraldet.train_scoraldet import _apt_init_criterion, _patch_apt, APT_POWER_DEFAULT, APT_THR_DEFAULT
+    except ModuleNotFoundError:
+        import sys as _sys
+        if str(_HERE) not in _sys.path:
+            _sys.path.insert(0, str(_HERE))
+        from build_scoraldet import register_scoraldet_modules
+        from train_scoraldet import _apt_init_criterion, _patch_apt, APT_POWER_DEFAULT, APT_THR_DEFAULT
 
 ROOT = Path(__file__).resolve().parents[2]
 
