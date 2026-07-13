@@ -38,7 +38,7 @@ SEEDS = [0, 1, 2]
 # HP chuan (khop mac dinh run_benchmark.ps1 / 3_train_baseline.py), DE VE train_defaults
 HP = dict(
     optimizer="SGD", lr0=0.001, lrf=0.01, weight_decay=0.0005, warmup_epochs=3,
-    epochs=100, imgsz=640, batch=16, workers=4,
+    epochs=100, imgsz=640, batch=16, workers=0,
 )
 
 EVAL_KW = dict(split="test", imgsz=640, batch=16, device="1", conf=0.001, iou=0.7)
