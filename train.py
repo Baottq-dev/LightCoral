@@ -4,11 +4,6 @@
 #   python train.py --data data/scoraldet_fold0.yaml --preset E8 --seed 1
 #   python train.py --data ... --modules ""        # baseline B0
 
-import os
-
-# Yeu cau server: chi dung GPU1
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
 import argparse
 import re
 import sys
@@ -148,7 +143,7 @@ def main():
     ap.add_argument("--weights", default=None, help="mac dinh theo module_specs.yaml")
     ap.add_argument("--specs", default=str(ROOT / "cfg" / "module_specs.yaml"))
     ap.add_argument("--project", default=str(ROOT / "runs" / "scyolo12"))  
-    ap.add_argument("--device", default=0)
+    ap.add_argument("--device", default=1)
     # Training hyperparameters
     ap.add_argument("--optimizer",     type=str,   default=None,
                     choices=["SGD", "Adam", "AdamW", "NAdam", "RAdam", "RMSProp", "auto"])

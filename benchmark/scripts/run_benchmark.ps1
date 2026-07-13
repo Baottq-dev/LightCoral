@@ -15,7 +15,7 @@ param(
     [int]    $Epochs       = 100,
     [int]    $ImgSz        = 640,
     [int]    $Batch        = 16,
-    [string] $Device       = "0",
+    [string] $Device       = "1",
     [int]    $Workers      = 0,
     [string] $Project      = "runs/coral_benchmark",
     [string] $EvalSplit    = "test",          # "val" hoặc "test"
@@ -28,7 +28,6 @@ param(
 
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 $env:PYTHONIOENCODING     = "utf-8"
-$env:CUDA_VISIBLE_DEVICES = "1"   # Yeu cau server: chi dung GPU1
 
 # ── Danh sách model muốn benchmark ───────────────────────────────────────────
 # Bỏ comment dòng nào muốn chạy.

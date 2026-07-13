@@ -14,14 +14,13 @@
 set -euo pipefail
 
 # ── Yeu cau server: chi dung GPU1 ────────────────────────────────────────────
-export CUDA_VISIBLE_DEVICES="1"
 export PYTHONIOENCODING="utf-8"
 
 # ── Default parameters ───────────────────────────────────────────────────────
 EPOCHS=100
 IMGSZ=640
 BATCH=16
-DEVICE="0"          # index 0 vi CUDA_VISIBLE_DEVICES=1 map GPU vat ly 1 -> index 0
+DEVICE="1"          # GPU vat ly 1 (Ultralytics tu set CUDA_VISIBLE_DEVICES)
 WORKERS=0
 PROJECT="runs/coral_benchmark"
 EVAL_SPLIT="test"

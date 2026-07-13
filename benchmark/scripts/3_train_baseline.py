@@ -34,11 +34,6 @@ Usage:
   python scripts/3_train_baseline.py --device cpu
 """
 
-import os
-
-# Yeu cau server: chi dung GPU1
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
 import argparse
 import sys
 from pathlib import Path
@@ -151,7 +146,7 @@ def parse_args():
     parser.add_argument("--hsv_v",   type=float, default=0.4)
 
     # ── Runtime ────────────────────────────────────────────────────────────────
-    parser.add_argument("--device",  type=str, default="0",
+    parser.add_argument("--device",  type=str, default="1",
                         help="CUDA device id (e.g. '0', '0,1') or 'cpu'.")
     parser.add_argument("--workers", type=int, default=0,
                         help="Dataloader workers. Use 0 on Windows to avoid multiprocessing issues.")

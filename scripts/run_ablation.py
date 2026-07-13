@@ -15,9 +15,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Yeu cau server: chi dung GPU1
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
-
 REPO = Path(__file__).resolve().parents[1]
 TRAIN = REPO / "train.py"
 assert TRAIN.exists(), f"Khong thay train.py tai {TRAIN}"
@@ -44,7 +41,7 @@ HP = dict(
     epochs=100, imgsz=640, batch=16, workers=0,
 )
 
-EVAL_KW = dict(split="test", imgsz=640, batch=16, device="0", conf=0.001, iou=0.7)
+EVAL_KW = dict(split="test", imgsz=640, batch=16, device="1", conf=0.001, iou=0.7)
 
 
 def run_name_for(mods_arg, seed):

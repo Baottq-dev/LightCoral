@@ -8,11 +8,7 @@ Usage:
 
 import argparse
 import json
-import os
 from pathlib import Path
-
-# Yeu cau server: chi dung GPU1
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from ultralytics import YOLO
 
@@ -31,7 +27,7 @@ def parse_args():
     parser.add_argument("--split",   type=str, default="test", choices=["val", "test"])
     parser.add_argument("--imgsz",   type=int, default=640)
     parser.add_argument("--batch",   type=int, default=8)
-    parser.add_argument("--device",  type=str, default="0")
+    parser.add_argument("--device",  type=str, default="1")
     parser.add_argument("--conf",    type=float, default=0.001)
     parser.add_argument("--iou",     type=float, default=0.7)
     parser.add_argument("--out_dir", type=str, default=None,
