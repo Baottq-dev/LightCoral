@@ -19,9 +19,9 @@ from ultralytics import YOLO
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
 # Dùng path relative đến script để portable trên mọi máy
-_SCRIPT_DIR = Path(__file__).resolve().parent          # f:.../scripts/
-_REPO_ROOT  = _SCRIPT_DIR.parent                       # f:.../LightCoral-YOLO/
-YAML_PATH   = _REPO_ROOT / "configs" / "coral_soft.yaml"
+_SCRIPT_DIR = Path(__file__).resolve().parent          # benchmark/scripts/
+_BENCH_ROOT = _SCRIPT_DIR.parent                       # benchmark/
+YAML_PATH   = _BENCH_ROOT / "configs" / "coral_soft.yaml"
 # ───────────────────────────────────────────────────────────────────────────────
 
 

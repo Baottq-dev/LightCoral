@@ -2,7 +2,7 @@
 # 6 classes, 646 underwater images
 # Source: f:/LightCoral-YOLO/data/coral_soft
 
-path: f:/LightCoral-YOLO/datasets/coral_soft_yolo
+path: datasets/coral_soft_yolo   # relative to Ultralytics datasets_dir (set to repo root)
 train: images/train
 val:   images/val
 test:  images/test

@@ -15,7 +15,7 @@ param(
     [int]    $Epochs       = 100,
     [int]    $ImgSz        = 640,
     [int]    $Batch        = 16,
-    [string] $Device       = "1",
+    [string] $Device       = "0",
     [int]    $Workers      = 0,
     [string] $Project      = "runs/coral_benchmark",
     [string] $EvalSplit    = "test",          # "val" hoặc "test"

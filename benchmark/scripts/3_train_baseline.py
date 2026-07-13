@@ -117,8 +117,9 @@ def parse_args():
     )
 
     # ── Data ───────────────────────────────────────────────────────────────────
+    _default_data = str(Path(__file__).resolve().parent.parent / "configs" / "coral_soft.yaml")
     parser.add_argument(
-        "--data", type=str, default="configs/coral_soft.yaml",
+        "--data", type=str, default=_default_data,
         help="Path to dataset YAML config.",
     )
 

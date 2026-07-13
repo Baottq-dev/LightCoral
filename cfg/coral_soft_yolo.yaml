@@ -4,7 +4,7 @@
 # Giu nguyen path + ten lop dung nhu file benchmark cu de ket qua so sanh duoc.
 # Ultralytics TU suy ra duong dan nhan: thay 'images' -> 'labels' trong path.
 
-path: f:/LightCoral-YOLO/datasets/coral_soft_yolo   # giu nguyen path benchmark cu (Windows, dung dau / xuoi)
+path: datasets/coral_soft_yolo   # relative to Ultralytics datasets_dir (set to repo root)
 train: images/train              # 80%
 val:   images/val                # 10%
 test:  images/test               # 10%
