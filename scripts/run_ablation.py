@@ -15,6 +15,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Yeu cau server: chi dung GPU1
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 REPO = Path(__file__).resolve().parents[1]
 TRAIN = REPO / "train.py"
 assert TRAIN.exists(), f"Khong thay train.py tai {TRAIN}"

@@ -143,7 +143,7 @@ def main():
     ap.add_argument("--weights", default=None, help="mac dinh theo module_specs.yaml")
     ap.add_argument("--specs", default=str(ROOT / "cfg" / "module_specs.yaml"))
     ap.add_argument("--project", default=str(ROOT / "runs" / "scyolo12"))  
-    ap.add_argument("--device", default=None)
+    ap.add_argument("--device", default=1)
     # Training hyperparameters
     ap.add_argument("--optimizer",     type=str,   default=None,
                     choices=["SGD", "Adam", "AdamW", "NAdam", "RAdam", "RMSProp", "auto"])
