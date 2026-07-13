@@ -76,6 +76,6 @@ train_defaults:
   hsv_v: 0.4
   # Runtime
   device: "1"
-  workers: 0           
+  workers: 4           
   pretrained: yolo12n.pt
   seeds: [0, 1, 2]

@@ -16,7 +16,7 @@ param(
     [int]    $ImgSz        = 640,
     [int]    $Batch        = 16,
     [string] $Device       = "1",
-    [int]    $Workers      = 0,
+    [int]    $Workers      = 4,
     [string] $Project      = "runs/coral_benchmark",
     [string] $EvalSplit    = "test",          # "val" hoặc "test"
     [int[]]  $Seeds        = @(0, 1, 2),      # Đa seed để tính mean±std

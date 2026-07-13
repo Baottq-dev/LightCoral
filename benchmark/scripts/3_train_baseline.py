@@ -148,7 +148,7 @@ def parse_args():
     # ── Runtime ────────────────────────────────────────────────────────────────
     parser.add_argument("--device",  type=str, default="1",
                         help="CUDA device id (e.g. '0', '0,1') or 'cpu'.")
-    parser.add_argument("--workers", type=int, default=0,
+    parser.add_argument("--workers", type=int, default=4,
                         help="Dataloader workers. Use 0 on Windows to avoid multiprocessing issues.")
     parser.add_argument("--seed",    type=int, default=0,
                         help="Random seed (multi-seed benchmark for mean+/-std).")
