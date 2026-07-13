@@ -8,7 +8,12 @@ Usage:
 
 import argparse
 import json
+import os
 from pathlib import Path
+
+# Yeu cau server: chi dung GPU1
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+
 from ultralytics import YOLO
 
 
